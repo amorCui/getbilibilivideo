@@ -9,6 +9,7 @@
   "author": "amor",
   "license": "ISC",
   "dependencies": {
+    "fluent-ffmpeg": "^2.1.2",
     "puppeteer": "^2.0.0",
     "puppeteer-extra": "^3.1.7",
     "puppeteer-extra-plugin-flash": "^2.2.2",

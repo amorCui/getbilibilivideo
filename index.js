@@ -176,6 +176,17 @@ var saveFile = async function (mediaObj, type, maxQuality, Referer, step) {
                 // if (!pause && start < total) {
                 if (start < total) {
                     download();
+                }else{
+                    switch (type){
+                        case 0:
+                            console.log('video download finish');
+                            break;
+                        case 1:
+                            console.log('audio download finish');
+                            break;
+                        default:
+                            break;
+                    }
                 }
             });
         }).end();
