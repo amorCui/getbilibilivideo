@@ -1,0 +1,5 @@
+var cookiesObj = {
+    str : `_uuid=169E78D2-6F00-D2CB-8E2F-32A30B3A64B495080infoc; buvid3=3AE73136-7013-4B13-921E-D5FD0D5D048F47179infoc; CURRENT_FNVAL=16; LIVE_BUVID=AUTO9915539642422071; _uuid=30CE953B-0521-7B6C-3899-84C367CBB0AE35496infoc; rpdid=|(J|J|~lkku|0J'ullYumR~lR; sid=l7656ofq; im_notify_type_9303600=0; fts=1556542898; CURRENT_QUALITY=116; _uuid=11716EAF-D61B-AE3D-8F49-D6481993F3E023929infoc; stardustvideo=1; laboratory=1-1; UM_distinctid=16e55bf5f1e496-0e4a9a334e1d6a-6353160-144000-16e55bf5f1f3b5; _ga=GA1.2.314640280.1573560879; Hm_lvt_8a6e55dbd2870f0f5bc9194cddf32a02=1576607468; DedeUserID=9303600; DedeUserID__ckMd5=b02b4dd5c961561a; SESSDATA=1d4cb123%2C1580644770%2C9b8eb911; bili_jct=529bf7948a31fb2a4a18b9a67805e7a6; flash_player_gray=false; html5_player_gray=false; bp_t_offset_9303600=342067486268448085; INTVER=1; stardustpgcv=0606`
+};
+
+module.exports = cookiesObj;
