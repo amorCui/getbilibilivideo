@@ -6,6 +6,12 @@ const path = require("path");
 
 const cookiesObj = require("./cookies");
 
+const ffmpeg = require('fluent-ffmpeg');
+
+/**
+ * get message in webDriver by url using puppeteer
+ * @param {*} webUrl 
+ */
 var getBilibiliJsonData = async function (webUrl) {
     const browser = await puppeteer.launch({
         headless: false,
@@ -22,8 +28,13 @@ var getBilibiliJsonData = async function (webUrl) {
         // console.log(m.text());
     });
 
-    var hostUrl, jsonDataStr;
-    var checkDataString = '<script>' + 'window.__playinfo__=';
+    var hostUrl;
+    var playInfoDataStrSubStart = '<script>' + 'window.__playinfo__=';
+    var playInfoDataStrSubEnd = '</script>';
+    var initialStateDataStrSubStart = '<script>' + 'window.__INITIAL_STATE__=';
+    var initialStateDataStrSubEnd = ';(function()';
+
+    var playInfoDataStr,initialStateDataStr;
 
     await page.setRequestInterception(true);
 
@@ -42,11 +53,15 @@ var getBilibiliJsonData = async function (webUrl) {
     page.on('response', async res => {
         if (res.url() === hostUrl) {
             if (res.status() === 200) {
-                jsonDataStr = await res.text();
-                var startIndex = jsonDataStr.indexOf(checkDataString) + checkDataString.length;
-                jsonDataStr = jsonDataStr.slice(startIndex);
-                var endIndex = jsonDataStr.indexOf('</script>');
-                jsonDataStr = jsonDataStr.slice(0, endIndex);
+                var dataStr = await res.text();
+                // var playInfoStartIndex = dataStr.indexOf(playInfoDataStrSubStart) + playInfoDataStrSubStart.length;
+                // playInfoDataStr = dataStr.slice(playInfoStartIndex);
+                // var playInfoEndIndex = playInfoDataStr.indexOf('</script>');
+                // playInfoDataStr = playInfoDataStr.slice(0, playInfoEndIndex);
+                
+                playInfoDataStr = getJsonDataStr(playInfoDataStrSubStart, playInfoDataStrSubEnd, dataStr);
+                initialStateDataStr = getJsonDataStr(initialStateDataStrSubStart, initialStateDataStrSubEnd, dataStr);
+                // var initialStateStartIndex = 
                 // console.log(jsonDataStr);
             }
 
@@ -60,9 +75,37 @@ var getBilibiliJsonData = async function (webUrl) {
     });
 
     await browser.close();
-    return JSON.parse(jsonDataStr);
+
+    // console.log('initialStateDataStr',initialStateDataStr);
+    var rstJson = {
+        playInfo: JSON.parse(playInfoDataStr),
+        initialState: JSON.parse(initialStateDataStr)
+    }
+
+    return rstJson;
 }
 
+/**
+ * 
+ * @param {*} subStart  截取字符串的头
+ * @param {*} subEnd    截取字符串的尾部
+ * @param {*} dataStr 数据字符串
+ */
+var getJsonDataStr = (subStart, subEnd, dataStr) =>{
+    var dataStr;
+    var startIndex = dataStr.indexOf(subStart) + subStart.length;
+    dataStr = dataStr.slice(startIndex);
+    var endIndex = dataStr.indexOf(subEnd);
+    dataStr = dataStr.slice(0, endIndex);
+    return dataStr;
+}
+
+/**
+ * add cookies by cookies string
+ * @param {*} cookies_str cookies string
+ * @param {*} page page of puppeteer
+ * @param {*} domain domain url
+ */
 var addCookies = async function (cookies_str, page, domain) {
     let cookies = cookies_str.split(';').map(
         pair => {
@@ -76,8 +119,17 @@ var addCookies = async function (cookies_str, page, domain) {
     }));
 }
 
-//type 0 video,1 audio
-var saveFile = async function (mediaObj, type, maxQuality, Referer, step) {
+/**
+ * save audio and video file
+ * @param {*} mediaObj  媒体的地址信息，用于下载
+ * @param {*} initialState 媒体的文本信息，例如文件名等
+ * @param {*} type type 0:video,1 audio
+ * @param {*} maxQuality 媒体的最大清晰度
+ * @param {*} Referer referer path
+ * @param {*} step range step
+ */
+var saveFile = async function (mediaObj, initialState, type, maxQuality, Referer, step) {
+    var fileName;
     let start = 0; // 请求初始值
     // step = 5000000; // 每次请求字符个数
     let total; // 文件总长度
@@ -135,8 +187,15 @@ var saveFile = async function (mediaObj, type, maxQuality, Referer, step) {
                 'If-Range': '5dee53ca-80854b80'
             }
         }
-        var fileName = configPath.slice(configPath.lastIndexOf('/') + 1, configPath.indexOf('?'));
-        ws = fs.createWriteStream(path.resolve(__dirname, fileName + '.mp4'));
+        // fileName = configPath.slice(configPath.lastIndexOf('/') + 1, configPath.indexOf('?')) + '.mp4';
+        fileName = initialState.h1Title;
+        fileName += type === 0? '_video': '_audio';
+        fileName += type === 0? '.mp4': '.mp3';
+        ws = fs.createWriteStream(path.resolve(__dirname, fileName));
+
+        // ws.on('drain',function () {
+        //     console.error("内存炸了");
+        // });
     }
 
     var find = (str, cha, num) => {
@@ -148,7 +207,7 @@ var saveFile = async function (mediaObj, type, maxQuality, Referer, step) {
     }
 
     // 下载函数
-    var download = () => {
+    var download = async () => {
         // 配置，每次范围请求 step 个字节
         config.headers.Range = `bytes=${start}-${start + step - 1}`;
 
@@ -156,7 +215,7 @@ var saveFile = async function (mediaObj, type, maxQuality, Referer, step) {
         start += step;
         // console.log('config:', config);
         // 发送请求
-        http.get(config, res => {
+        http.get(config,res => {
             // console.log('res.headers:', res.headers);
             // console.log('res.headers["content-range"]:', res.headers["content-range"]);
             // 获取文件总长度
@@ -180,9 +239,11 @@ var saveFile = async function (mediaObj, type, maxQuality, Referer, step) {
                     switch (type){
                         case 0:
                             console.log('video download finish');
+                            ws.end();//结束，如果调用end,会强制将内存中的内容全部写入，然后关闭文件
                             break;
                         case 1:
                             console.log('audio download finish');
+                            ws.end();
                             break;
                         default:
                             break;
@@ -202,7 +263,8 @@ var saveFile = async function (mediaObj, type, maxQuality, Referer, step) {
             break;
     }
 
-    download();
+    await download();
+    return fileName;
 }
 
 
@@ -223,17 +285,47 @@ var getMaxQuality = (josnData) => {
     return maxQuality;
 }
 
+var mergeFile = function(videoPath,audioPath,outputPath){
+    var command = ffmpeg();
 
+    // console.log(command);
+    
+    command.input(videoPath)
+        .input(audioPath)
+        .ffprobe(0,
+          function(err, data) {
+            // console.log('file1 metadata:');
+            // console.dir(data);
+          });
+    
+    command
+        .on('start', function (commandLine) {
+            console.log('Spawned Ffmpeg with command: ' + commandLine);
+        })
+        .on('error', function (err, stdout, stderr) {
+            console.log('Cannot process video: ' + err.message);
+            console.log('Cannot process video: ' + err.stack);
+        })
+        .on('progress', function(progress) {
+            console.log('Processing: ' + progress.percent + '% done');
+          })
+        .save(path.resolve(__dirname, outputPath));
+}
 
 
 var start = async function (webUrl, step) {
     var josnData = await getBilibiliJsonData(webUrl);
-
-    var maxQuality = getMaxQuality(josnData);
+    var playInfo = josnData.playInfo;
+    var initialState = josnData.initialState;
+    var maxQuality = getMaxQuality(playInfo);
     console.log('download video');
-    await saveFile(josnData.data, 0, maxQuality, webUrl, step);
+    var videoName = await saveFile(playInfo.data, initialState, 0, maxQuality, webUrl, step);
+    console.log('video Name:', videoName);
     console.log('download audio');
-    await saveFile(josnData.data, 1, maxQuality, webUrl, step);
+    var audioName = await saveFile(playInfo.data, initialState, 1, maxQuality, webUrl, step);
+    console.log('audio Name:', audioName);
+
+    // mergeFile(videoName, audioName, initialState.h1Title);
 }
 
 var webUrl = 'https://www.bilibili.com/bangumi/play/ep292951';
