@@ -207,7 +207,7 @@ var saveFile = async function (mediaObj, initialState, type, maxQuality, Referer
     }
 
     // 下载函数
-    var download = async () => {
+    var download = () => {
         // 配置，每次范围请求 step 个字节
         config.headers.Range = `bytes=${start}-${start + step - 1}`;
 
@@ -263,7 +263,7 @@ var saveFile = async function (mediaObj, initialState, type, maxQuality, Referer
             break;
     }
 
-    await download();
+    download();
     return fileName;
 }
 
@@ -288,6 +288,24 @@ var getMaxQuality = (josnData) => {
 var mergeFile = function(videoPath,audioPath,outputPath){
     var command = ffmpeg();
 
+    var flagOptions = [
+        {
+            flag: 25,
+            value : true
+        },
+        {
+            flag: 50,
+            value : true
+        },
+        {
+            flag: 75,
+            value : true
+        },
+        {
+            flag: 100,
+            value : true
+        }
+    ];
     // console.log(command);
     
     command.input(videoPath)
@@ -307,8 +325,13 @@ var mergeFile = function(videoPath,audioPath,outputPath){
             console.log('Cannot process video: ' + err.stack);
         })
         .on('progress', function(progress) {
-            console.log('Processing: ' + progress.percent + '% done');
-          })
+            for(var flagOption of flagOptions){
+                if( flagOption.value && progress.percent >= flagOption.flag ){
+                    console.log('Processing: ' + flagOption.flag + '% done');
+                    flagOption.value = false;
+                }
+            }
+        })
         .save(path.resolve(__dirname, outputPath));
 }
 
