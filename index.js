@@ -128,7 +128,7 @@ var addCookies = async function (cookies_str, page, domain) {
  * @param {*} Referer referer path
  * @param {*} step range step
  */
-var saveFile = async function (mediaObj, initialState, type, maxQuality, Referer, step) {
+var saveFile = (mediaObj, initialState, type, maxQuality, Referer, step)=> new Promise((resolve) =>{
     var fileName;
     let start = 0; // 请求初始值
     // step = 5000000; // 每次请求字符个数
@@ -240,10 +240,12 @@ var saveFile = async function (mediaObj, initialState, type, maxQuality, Referer
                         case 0:
                             console.log('video download finish');
                             ws.end();//结束，如果调用end,会强制将内存中的内容全部写入，然后关闭文件
+                            return fileName;
                             break;
                         case 1:
                             console.log('audio download finish');
                             ws.end();
+                            return fileName;
                             break;
                         default:
                             break;
@@ -264,8 +266,8 @@ var saveFile = async function (mediaObj, initialState, type, maxQuality, Referer
     }
 
     download();
-    return fileName;
-}
+    // return fileName;
+})  
 
 
 
@@ -335,19 +337,36 @@ var mergeFile = function(videoPath,audioPath,outputPath){
         .save(path.resolve(__dirname, outputPath));
 }
 
+var downloadFiles = async (data, initialState,  maxQuality, webUrl, step)=>{
+    console.log('download video');
+    var videoName = saveFile(data, initialState, 0, maxQuality, webUrl, step);
+    console.log('download audio');
+    var audioName = saveFile(data, initialState, 1, maxQuality, webUrl, step);
+
+    await videoName;
+    console.log('video Name:', videoName);
+    await audioName;
+    console.log('audio Name:', audioName);
+
+    return {videoName, audioName};
+}
+
 
 var start = async function (webUrl, step) {
     var josnData = await getBilibiliJsonData(webUrl);
     var playInfo = josnData.playInfo;
     var initialState = josnData.initialState;
     var maxQuality = getMaxQuality(playInfo);
-    console.log('download video');
-    var videoName = await saveFile(playInfo.data, initialState, 0, maxQuality, webUrl, step);
-    console.log('video Name:', videoName);
-    console.log('download audio');
-    var audioName = await saveFile(playInfo.data, initialState, 1, maxQuality, webUrl, step);
-    console.log('audio Name:', audioName);
-
+    // console.log('download video');
+    // var videoName = saveFile(playInfo.data, initialState, 0, maxQuality, webUrl, step);
+    // console.log('video Name:', videoName);
+    // console.log('download audio');
+    // var audioName = saveFile(playInfo.data, initialState, 1, maxQuality, webUrl, step);
+    // console.log('audio Name:', audioName);
+    downloadFiles(playInfo.data, initialState, maxQuality, webUrl, step).then(({videoName, audioName})=>{
+        console.log('download finish!!!');
+        // mergeFile(videoName, audioName, initialState.h1Title);
+    });
     // mergeFile(videoName, audioName, initialState.h1Title);
 }
 
