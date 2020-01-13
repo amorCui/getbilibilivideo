@@ -37,7 +37,7 @@ var getBilibiliJsonData = async function (webUrl) {
     var initialStateDataStrSubStart = '<script>' + 'window.__INITIAL_STATE__=';
     var initialStateDataStrSubEnd = ';(function()';
 
-    var playInfoDataStr,initialStateDataStr;
+    var playInfoDataStr, initialStateDataStr;
 
     await page.setRequestInterception(true);
 
@@ -61,7 +61,7 @@ var getBilibiliJsonData = async function (webUrl) {
                 // playInfoDataStr = dataStr.slice(playInfoStartIndex);
                 // var playInfoEndIndex = playInfoDataStr.indexOf('</script>');
                 // playInfoDataStr = playInfoDataStr.slice(0, playInfoEndIndex);
-                
+
                 playInfoDataStr = getJsonDataStr(playInfoDataStrSubStart, playInfoDataStrSubEnd, dataStr);
                 initialStateDataStr = getJsonDataStr(initialStateDataStrSubStart, initialStateDataStrSubEnd, dataStr);
                 // var initialStateStartIndex = 
@@ -80,10 +80,17 @@ var getBilibiliJsonData = async function (webUrl) {
     await browser.close();
 
     // console.log('initialStateDataStr',initialStateDataStr);
-    var rstJson = {
-        playInfo: JSON.parse(playInfoDataStr),
-        initialState: JSON.parse(initialStateDataStr)
+    try{
+        var rstJson = {
+            playInfo: JSON.parse(playInfoDataStr),
+            initialState: JSON.parse(initialStateDataStr)
+        }
+    }catch(e){
+        console.log('Exception:',e)
+        console.log('playInfoDataStr:',playInfoDataStr);
+        console.log('initialStateDataStr:',initialStateDataStr);
     }
+    
 
     return rstJson;
 }
@@ -94,7 +101,7 @@ var getBilibiliJsonData = async function (webUrl) {
  * @param {*} subEnd    截取字符串的尾部
  * @param {*} dataStr 数据字符串
  */
-var getJsonDataStr = (subStart, subEnd, dataStr) =>{
+var getJsonDataStr = (subStart, subEnd, dataStr) => {
     var dataStr;
     var startIndex = dataStr.indexOf(subStart) + subStart.length;
     dataStr = dataStr.slice(startIndex);
@@ -126,12 +133,13 @@ var addCookies = async function (cookies_str, page, domain) {
  * save audio and video file
  * @param {*} mediaObj  媒体的地址信息，用于下载
  * @param {*} initialState 媒体的文本信息，例如文件名等
+ * @param {*} folderName 保存的文件夹
  * @param {*} type type 0:video,1 audio
  * @param {*} maxQuality 媒体的最大清晰度
  * @param {*} Referer referer path
  * @param {*} step range step
  */
-var saveFile = (mediaObj, initialState, type, maxQuality, Referer, step)=> new Promise((resolve) =>{
+var saveFile = (mediaObj, initialState, folderName, type, maxQuality, Referer, step) => new Promise((resolve) => {
     var fileName;
     let start = 0; // 请求初始值
     // step = 5000000; // 每次请求字符个数
@@ -145,30 +153,30 @@ var saveFile = (mediaObj, initialState, type, maxQuality, Referer, step)=> new P
     var setOptions = function (jsonObj, maxQuality) {
         var obj;
         var maxObj;
- 
+
         for (var o of jsonObj) {
             if (o.id === maxQuality) {
                 obj = o;
             }
-            if(!maxObj){
+            if (!maxObj) {
                 maxObj = o;
-            }else{
-                if(o > maxObj){
+            } else {
+                if (o > maxObj) {
                     maxObj = o;
                 }
             }
         }
 
         //不存在对应id的话，取id最大的
-        if(!obj){
+        if (!obj) {
             obj = maxObj;
         }
 
         var baseUrl;
         // console.log('obj',obj);
-        if(obj.baseUrl){
+        if (obj.baseUrl) {
             baseUrl = obj.baseUrl;
-        }else if(obj.base_url){
+        } else if (obj.base_url) {
             baseUrl = obj.base_url;
         }
 
@@ -192,9 +200,9 @@ var saveFile = (mediaObj, initialState, type, maxQuality, Referer, step)=> new P
         }
         // fileName = configPath.slice(configPath.lastIndexOf('/') + 1, configPath.indexOf('?')) + '.mp4';
         fileName = initialState.h1Title;
-        fileName += type === 0? '_video': '_audio';
-        fileName += type === 0? '.mp4': '.mp3';
-        ws = fs.createWriteStream(path.resolve(__dirname, fileName));
+        fileName += type === 0 ? '_video' : '_audio';
+        fileName += type === 0 ? '.mp4' : '.mp3';
+        ws = fs.createWriteStream(path.resolve(__dirname, folderName + fileName));
 
         // ws.on('drain',function () {
         //     console.error("内存炸了");
@@ -218,7 +226,7 @@ var saveFile = (mediaObj, initialState, type, maxQuality, Referer, step)=> new P
         start += step;
         // console.log('config:', config);
         // 发送请求
-        http.get(config,res => {
+        http.get(config, res => {
             // console.log('res.headers:', res.headers);
             // console.log('res.headers["content-range"]:', res.headers["content-range"]);
             // 获取文件总长度
@@ -238,8 +246,8 @@ var saveFile = (mediaObj, initialState, type, maxQuality, Referer, step)=> new P
                 // if (!pause && start < total) {
                 if (start < total) {
                     download();
-                }else{
-                    switch (type){
+                } else {
+                    switch (type) {
                         case 0:
                             console.log('video download finish', fileName);
                             ws.end();//结束，如果调用end,会强制将内存中的内容全部写入，然后关闭文件
@@ -270,7 +278,7 @@ var saveFile = (mediaObj, initialState, type, maxQuality, Referer, step)=> new P
 
     download();
     // return fileName;
-})  
+})
 
 
 
@@ -290,10 +298,10 @@ var getMaxQuality = (josnData) => {
     return maxQuality;
 }
 
-var mergeFile = function(videoPath,audioPath,outputPath){
+var mergeFile = function (videoPath, audioPath, outputPath) {
     var command = ffmpeg();
     var pb = new ProgressBar('合并音频视频进度', 50);
-    
+
     command.input(videoPath)
         .input(audioPath)
         // .ffprobe(0,
@@ -302,7 +310,7 @@ var mergeFile = function(videoPath,audioPath,outputPath){
         //     // console.dir(data);
         //   })
         ;
-    
+
     command
         .on('start', function (commandLine) {
             console.log('Spawned Ffmpeg with command: ' + commandLine);
@@ -311,28 +319,29 @@ var mergeFile = function(videoPath,audioPath,outputPath){
             console.log('Cannot process video: ' + err.message);
             console.log('Cannot process video: ' + err.stack);
         })
-        .on('progress', function(progress) {
+        .on('progress', function (progress) {
             pb.render(progress.percent / 100);
         })
         .save(path.resolve(__dirname, outputPath))
         ;
 }
 
-var downloadFiles = async (data, initialState,  maxQuality, webUrl, step)=>{
+var downloadFiles = async (data, initialState, maxQuality, webUrl, step) => {
+    var folderName = 'download/';
     console.log('download video');
-    var videoPromise = saveFile(data, initialState, 0, maxQuality, webUrl, step);
+    var videoPromise = saveFile(data, initialState, folderName, 0, maxQuality, webUrl, step);
     console.log('download audio');
-    var audioPromise = saveFile(data, initialState, 1, maxQuality, webUrl, step);
+    var audioPromise = saveFile(data, initialState, folderName, 1, maxQuality, webUrl, step);
 
-    Promise.all([videoPromise, audioPromise]).then(([videoName, audioName])=>{
+    Promise.all([videoPromise, audioPromise]).then(([videoName, audioName]) => {
         console.log('video Name:', videoName);
         console.log('audio Name:', audioName);
-        console.log('initialState.h1Title:',initialState.h1Title);
-        mergeFile(videoName, audioName, initialState.h1Title + '.mp4');
-        return {videoName, audioName};
+        console.log('initialState.h1Title:', initialState.h1Title);
+        mergeFile(folderName + videoName, folderName + audioName, folderName + initialState.h1Title + '.mp4');
+        return { videoName, audioName };
     });
     // await videoName;
-    
+
     // await audioName;
     // console.log('audio Name:', audioName);
 
@@ -359,7 +368,16 @@ var start = async function (webUrl, step) {
     // mergeFile(videoName, audioName, initialState.h1Title);
 }
 
-var webUrl = 'https://www.bilibili.com/bangumi/play/ep292951';
-var step = 5000000;
-start(webUrl, step);;
+var main = async () => {
+    var index = 292963;
+    for (var i = 0; i < 1; i++) {
+        var webUrl = 'https://www.bilibili.com/bangumi/play/ep' + (index + i);
+        var step = 5000000;
+        await start(webUrl, step);
+    }
+}
+
+main();
+
+
 
