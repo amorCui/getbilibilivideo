@@ -8,6 +8,9 @@ const cookiesObj = require("./cookies");
 
 const ffmpeg = require('fluent-ffmpeg');
 
+//引入进度条
+const ProgressBar = require('./progressBar');
+
 /**
  * get message in webDriver by url using puppeteer
  * @param {*} webUrl 
@@ -238,14 +241,14 @@ var saveFile = (mediaObj, initialState, type, maxQuality, Referer, step)=> new P
                 }else{
                     switch (type){
                         case 0:
-                            console.log('video download finish');
+                            console.log('video download finish', fileName);
                             ws.end();//结束，如果调用end,会强制将内存中的内容全部写入，然后关闭文件
-                            return fileName;
+                            resolve(fileName);
                             break;
                         case 1:
-                            console.log('audio download finish');
+                            console.log('audio download finish', fileName);
                             ws.end();
-                            return fileName;
+                            resolve(fileName);
                             break;
                         default:
                             break;
@@ -289,34 +292,16 @@ var getMaxQuality = (josnData) => {
 
 var mergeFile = function(videoPath,audioPath,outputPath){
     var command = ffmpeg();
-
-    var flagOptions = [
-        {
-            flag: 25,
-            value : true
-        },
-        {
-            flag: 50,
-            value : true
-        },
-        {
-            flag: 75,
-            value : true
-        },
-        {
-            flag: 100,
-            value : true
-        }
-    ];
-    // console.log(command);
+    var pb = new ProgressBar('合并音频视频进度', 50);
     
     command.input(videoPath)
         .input(audioPath)
-        .ffprobe(0,
-          function(err, data) {
-            // console.log('file1 metadata:');
-            // console.dir(data);
-          });
+        // .ffprobe(0,
+        //   function(err, data) {
+        //     // console.log('file1 metadata:');
+        //     // console.dir(data);
+        //   })
+        ;
     
     command
         .on('start', function (commandLine) {
@@ -327,28 +312,31 @@ var mergeFile = function(videoPath,audioPath,outputPath){
             console.log('Cannot process video: ' + err.stack);
         })
         .on('progress', function(progress) {
-            for(var flagOption of flagOptions){
-                if( flagOption.value && progress.percent >= flagOption.flag ){
-                    console.log('Processing: ' + flagOption.flag + '% done');
-                    flagOption.value = false;
-                }
-            }
+            pb.render(progress.percent / 100);
         })
-        .save(path.resolve(__dirname, outputPath));
+        .save(path.resolve(__dirname, outputPath))
+        ;
 }
 
 var downloadFiles = async (data, initialState,  maxQuality, webUrl, step)=>{
     console.log('download video');
-    var videoName = saveFile(data, initialState, 0, maxQuality, webUrl, step);
+    var videoPromise = saveFile(data, initialState, 0, maxQuality, webUrl, step);
     console.log('download audio');
-    var audioName = saveFile(data, initialState, 1, maxQuality, webUrl, step);
+    var audioPromise = saveFile(data, initialState, 1, maxQuality, webUrl, step);
 
-    await videoName;
-    console.log('video Name:', videoName);
-    await audioName;
-    console.log('audio Name:', audioName);
+    Promise.all([videoPromise, audioPromise]).then(([videoName, audioName])=>{
+        console.log('video Name:', videoName);
+        console.log('audio Name:', audioName);
+        console.log('initialState.h1Title:',initialState.h1Title);
+        mergeFile(videoName, audioName, initialState.h1Title + '.mp4');
+        return {videoName, audioName};
+    });
+    // await videoName;
+    
+    // await audioName;
+    // console.log('audio Name:', audioName);
 
-    return {videoName, audioName};
+    // return {videoName, audioName};
 }
 
 
@@ -363,10 +351,11 @@ var start = async function (webUrl, step) {
     // console.log('download audio');
     // var audioName = saveFile(playInfo.data, initialState, 1, maxQuality, webUrl, step);
     // console.log('audio Name:', audioName);
-    downloadFiles(playInfo.data, initialState, maxQuality, webUrl, step).then(({videoName, audioName})=>{
-        console.log('download finish!!!');
-        // mergeFile(videoName, audioName, initialState.h1Title);
-    });
+    downloadFiles(playInfo.data, initialState, maxQuality, webUrl, step);
+    // downloadFiles(playInfo.data, initialState, maxQuality, webUrl, step).then(({videoName, audioName})=>{
+    //     console.log('download finish!!!');
+    //     // mergeFile(videoName, audioName, initialState.h1Title);
+    // });
     // mergeFile(videoName, audioName, initialState.h1Title);
 }
 
